@@ -7,11 +7,19 @@ if (!window.console || !console.firebug) {
 
 
 var startPos=1;
-
+var defaultServices = '"facebook","twitter","linkedin","email","sharethis"';
 // Do not make tags on page load. call Make Tags once the user changes any settings.
 var makeTagsEnabled = false;
 
 function st_log() {
+	if ($('#st_copynshare').attr('checked')) {
+		var pubkey = $('#st_pkey').val();
+		if (pubkey == "") {
+			if ($('#st_pkey_hidden').val() != "")
+				pubkey = $('#st_pkey_hidden').val();		
+		}
+		_gaq.push(['_trackEvent', 'WordPressPlugin', 'ClosedLoopBetaPublishers', pubkey]);
+	}
 	_gaq.push(['_trackEvent', 'WordPressPlugin', 'ConfigOptionsUpdated']);
 	_gaq.push(['_trackEvent', 'WordPressPlugin', "Type_" + $("#st_current_type").val()]);
 	if ($("#get5x").attr("checked")) {
@@ -63,6 +71,10 @@ jQuery(document).ready(function() {
 		stpkeytimeout=setTimeout(function(){makeHeadTag();},500);
 	})
 
+	$('#st_widget').bind('keyup', function(){
+		checkCopyNShare();
+	})
+
 	var services=$('#st_services').val();
 	svc=services.split(",");
 	for(var i=0;i<svc.length;i++){
@@ -79,6 +91,10 @@ jQuery(document).ready(function() {
 	if (tag.match(/new sharethis\.widgets\.serviceWidget/)){
 		$('#st_sharenow').attr('checked','checked');
 	}
+	if (tag.match(/new sharethis\.widgets\.hoverbuttons/)){
+		$('#st_hoverbar').attr('checked','checked');
+	}
+	checkCopyNShare();
 	var matches3 = tag.match(/"style": "(\d)*"/); 
 	if (matches3!=null && typeof(matches3[1])!="undefined"){
 		$('ul#themeList').find('li.selected').removeClass('selected');
@@ -169,10 +185,18 @@ jQuery(document).ready(function() {
 		stpkeytimeout=setTimeout(function(){makeTags();},500);
 	})
 	
+	$('#st_hoverbar').bind('click', function(){
+		generateHoverbar("left");
+	});
+	
 	$('#st_sharenow').bind('click', function(){
 		generateShareNow();
 	});
 	
+	$('#st_copynshare').bind('click', function(){
+		generateCopyNShare();
+	});
+
 	$('#st_via').bind('keyup', function(){
 		makeTags();
 	})
@@ -195,24 +219,189 @@ jQuery(document).ready(function() {
 var stkeytimeout=null;
 var stpkeytimeout=null;
 
+function checkCopyNShare(){
+	var tag=$('#st_widget').val();
+	var pubkey = $('#st_pkey').val();
+	if (pubkey == "") {
+		if ($('#st_pkey_hidden').val() != "")
+			pubkey = $('#st_pkey_hidden').val();		
+	}
+	if (tag.match(/doNotHash:(\s)?false/)){
+		$('#st_copynshare').attr('checked','checked');
+		$(".cnsRegister").hide();
+		$(".cnsCheck").show();
+	} else {
+		if ((/[^rp\.\-]\w{8}-\w{4}-\w{4}-\w{4}-\w{12}/).test(pubkey) || (/[^rp\.\-]\w{8}-\w{4}-\w{4}-\w{4}-\w{12}/).test(tag)) {
+			$(".cnsRegister").hide();
+			$(".cnsCheck").show();
+		} else {
+			$(".cnsRegister").show();
+			$(".cnsCheck").hide();
+		}
+	}
+}
+
+function getCopyNShare(){
+	if ($('#st_copynshare').attr('checked')) {
+		return ", hashAddressBar: true, doNotCopy: false, doNotHash: false";
+	} else {
+		return "";
+	}
+}
+
+function generateCopyNShare(){
+	var pubkey = $('#st_pkey').val();
+	if (pubkey == "") {
+		if ($('#st_pkey_hidden').val() != "")
+			pubkey = $('#st_pkey_hidden').val();
+	}
+
+	var tag=$('#st_widget').val();
+	tag = tag.replace(/stLight.options\({.*}\);/, 'stLight.options({publisher:"'+pubkey+'"'+getCopyNShare()+'});');
+	$('#st_widget').val(tag);
+	checkCopyNShare();
+}
+
 function generateShareNow(){
 	var pubkey = $('#st_pkey').val();
 	if (pubkey == "") {
 		if ($('#st_pkey_hidden').val() != "")
 			pubkey = $('#st_pkey_hidden').val();
 	}
-	var tag='<script charset="utf-8" type="text/javascript" src="http://w.sharethis.com/button/buttons.js"></script>';
-	tag+='<script type="text/javascript">stLight.options({publisher:"'+pubkey+'"});</script>';
-	if ($('#st_sharenow').attr('checked')) {
-		tag+='<script charset="utf-8" type="text/javascript" src="http://s.sharethis.com/loader.js"></script>';
-		tag+='<script charset="utf-8" type="text/javascript">var options={ "service": "facebook", "timer": { "countdown": 30, "interval": 10, "enable": false}, "frictionlessShare": false, "style": "3", publisher:"'+pubkey+'"};var st_service_widget = new sharethis.widgets.serviceWidget(options);</script>';
+	
+	var switchTo5x = "true";
+	if($("#get4x").attr('checked')){
+		switchTo5x = "false";
 	}
+	
+	var tag='<script charset="utf-8" type="text/javascript">var switchTo5x='+switchTo5x+';</script>';
+	
+	//var tag='<script charset="utf-8" type="text/javascript" src="http://w.sharethis.com/button/buttons.js"></script>';
+	tag+='<script charset="utf-8" type="text/javascript" src="http://w.sharethis.com/button/buttons.js"></script>';
+	tag+='<script type="text/javascript">stLight.options({publisher:"'+pubkey+'"'+getCopyNShare()+'});</script>';
+	if ($('#st_sharenow').attr('checked')) {
+	
+		if($('#st_hoverbar').attr('checked')){
+		 
+		 // Hoverbar already present and ShareNow Checked, need to move the hoverbar to right
+		 $('#st_widget').val("");
+		tag+='<script charset="utf-8" type="text/javascript" src="http://s.sharethis.com/loader.js"></script>';
+		 $('#st_widget').val(tag);
+		 defaultPosition = "right";
+		 generateHoverbar(defaultPosition); 
+		 
+		 tag = $('#st_widget').val(); // get the present tag and append ShareNow option
+		 
+		}else{		
+			// simple sharenow
+			tag+='<script charset="utf-8" type="text/javascript" src="http://s.sharethis.com/loader.js"></script>';
+		}
+		tag+='<script charset="utf-8" type="text/javascript">var options={ "service": "facebook", "timer": { "countdown": 30, "interval": 10, "enable": false}, "frictionlessShare": false, "style": "3", publisher:"'+pubkey+'"};var st_service_widget = new sharethis.widgets.serviceWidget(options);</script>';
+		
 	$('#st_widget').val(tag);
+		
 	$.each($('ul#themeList').find('li'), function(index, value) {
 		if ($(value).hasClass("selected")) {
 			updateShareNowStyle($(value).attr('data-value'));
 		}
 	}); 
+	
+	}else{
+		if($('#st_hoverbar').attr('checked')){			
+			// ShareNow unchecked so move the HoverBar to left
+			defaultPosition = "left";
+			generateHoverbar(defaultPosition);		 
+		}else{
+			// Simple buttons with NO sharenow and NO hoverbar
+			var tag='<script charset="utf-8" type="text/javascript" src="http://w.sharethis.com/button/buttons.js"></script>';
+			tag+='<script type="text/javascript">stLight.options({publisher:"'+pubkey+'"'+getCopyNShare()+'});</script>';
+			$('#st_widget').val(tag);
+		}
+	}
+	
+}
+
+function updateHoverBarServices(){
+	
+	if($('#st_hoverbar').attr('checked')){
+		var defaultPosition = "left";
+		if($('#st_sharenow').attr('checked')){		
+				defaultPosition = "right";
+		}
+		generateShareNow();
+	}
+}
+
+String.prototype.trim=function(){return this.replace(/^\s\s*/, '').replace(/\s\s*$/, '');};
+
+function generateHoverbar(defaultPosition) {
+
+	// In case of button style = sharethis (4/7) default. 
+	// Remove FBLike, Google+,Pinterest from hoverbar services
+	
+	if($('.services').is(":visible")){		
+		// Adding double quotes for each service separated by comma
+		var chickletServices = $('#st_services').val();
+		var chickletServicesArray = chickletServices.split(','); 
+		var newchickletServicesArray = new Array();
+		var jCounter = 0;
+		for(var i=0; i<chickletServicesArray.length; i++){
+			// Skip FbLike and PlusOne in HoverBar
+			if(chickletServicesArray[i].trim() != 'plusone' && chickletServicesArray[i].trim() != 'fblike') {
+				newchickletServicesArray[jCounter] = '"'+chickletServicesArray[i].trim()+'"';
+				jCounter++;
+			}
+		}
+		chickletServices = newchickletServicesArray.join(',');
+	}else{
+		chickletServices = defaultServices;
+	}
+	
+	var pubkey = $('#st_pkey').val();
+	if (pubkey == "") {
+		if ($('#st_pkey_hidden').val() != "")
+			pubkey = $('#st_pkey_hidden').val();
+		else
+			pubkey = generatePublisherKey();
+	}
+	
+	var switchTo5x = "true";
+	if($("#get4x").attr('checked')){
+		switchTo5x = "false";
+	}
+	
+	var tag='<script charset="utf-8" type="text/javascript">var switchTo5x='+switchTo5x+';</script>';
+	
+	//var tag='<script charset="utf-8" type="text/javascript" src="http://w.sharethis.com/button/buttons.js"></script>';
+	tag +='<script charset="utf-8" type="text/javascript" src="http://w.sharethis.com/button/buttons.js"></script>';
+	tag+='<script type="text/javascript">stLight.options({publisher:"'+pubkey+'"'+getCopyNShare()+'});</script>';	
+	if ($('#st_hoverbar').attr('checked')) {
+		
+		if($('#st_sharenow').attr('checked')){		
+			defaultPosition = "right";
+			tag = $('#st_widget').val(); // get the present tag and append HoverBar option			
+		}else{
+			tag+='<script charset="utf-8" type="text/javascript" src="http://s.sharethis.com/loader.js"></script>';
+		}	
+		
+		tag+='<script charset="utf-8" type="text/javascript">var options={ publisher:"'+pubkey+'", "position": "'+defaultPosition+'", "chicklets": { "items": ['+chickletServices+'] } }; var st_hover_widget = new sharethis.widgets.hoverbuttons(options);</script>';		
+		
+		$('#st_widget').val(tag);
+		
+	}else {
+		if($('#st_sharenow').attr('checked')){
+			// generating simple sharenow - hoverbar unchecked
+			/*defaultPosition = "left";*/
+			generateShareNow();
+		}else{
+			// Simple buttons with NO sharenow and NO hoverbar
+			var tag='<script charset="utf-8" type="text/javascript" src="http://w.sharethis.com/button/buttons.js"></script>';
+			tag+='<script type="text/javascript">stLight.options({publisher:"'+pubkey+'"'+getCopyNShare()+'});</script>';
+			$('#st_widget').val(tag);
+		}	
+	}
+	
+	
 }
 
 function updateShareNowStyle(themeid){
@@ -227,6 +416,7 @@ function makeHeadTag(){
 	var reg=new RegExp("(publisher:)('|\")(.*?)('|\")",'gim');
 	var b=tag.replace(reg,'$1$2'+val+'$4');
 	$('#st_widget').val(b);
+	checkCopyNShare();
 }
 
 
@@ -268,7 +458,8 @@ function makeTags(){
 		}
 	}
 	$('#st_tags').val(tags);
-
+	// If hover Bar is already selected
+	updateHoverBarServices();
 }
 
 
@@ -299,6 +490,10 @@ function carDoneCB(a,elem){
 			$('.fblikeplusone').hide();
 			$('#curr_type').html("classic");$("#st_current_type").val("classic");
 			$('#currentType').html("<span class='type_name'>Classic</span>");
+			
+			// In case of button style = sharethis (4/7) default. 
+			// Remove FBLike, Google+,Pinterest from hoverbar services
+			updateHoverBarServices();
 	}	
 	if(makeTagsEnabled == true) {
 	makeTags();	
@@ -319,7 +514,7 @@ function createOverlay () {
 		var div = container.find("#registratorModalWindow");
 		var html = "<div class='registratorContainer'>";
 		html += "<div onclick=javascript:container.remove(); class='registratorCloser'></div>";
-		html += "<iframe height='341px' width='551px' src='http://sharethis.com/external-login' />";
+		html += "<iframe height='390px' width='641px' src='http://sharethis.com/external-login' frameborder='0' />";
 		div.append(html);
 }
 
