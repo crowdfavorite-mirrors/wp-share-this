@@ -10,6 +10,7 @@ Social Charge your Content with ShareThis - features Social Analytics, CopyNShar
 
 == Description ==
 
+
 **Increase social activity on your site with ShareThis!**
 
 * Choose from to 120 social channels, including Facebook, Twitter, LinkedIn, and Pinterest.
